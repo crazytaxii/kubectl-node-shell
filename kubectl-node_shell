@@ -231,9 +231,9 @@ cat <<EOT
       }
     ],
     "tolerations": [
-      { "key": "CriticalAddonsOnly", "operator": "Exists" },
-      { "effect": "NoExecute",       "operator": "Exists" }
+      { "operator": "Exists" }
     ],
+    "priorityClassName": "system-node-critical",
     "volumes": $volumes
   }
 }
