@@ -21,6 +21,7 @@ use_mount=true
 use_pid=true
 use_net=true
 use_uts=true
+silent=false
 
 if [ -t 0 ]; then
   tty=true
@@ -101,6 +102,10 @@ while [ $# -gt 0 ]; do
     ;;
   --no-uts)
     use_uts=false
+    shift
+    ;;
+  --silent)
+    silent=true
     shift
     ;;
   --)
@@ -245,7 +250,13 @@ if [ "$m" -lt 18 ]; then
   generator="--generator=run-pod/v1"
 fi
 
-trap "EC=\$?; $kubectl delete pod --wait=false $pod >&2 || true; exit \$EC" EXIT INT TERM
+if [ "$silent" = true ]; then
+  trap "EC=\$?; $kubectl delete pod --wait=false $pod >/dev/null 2>&1 || true; exit \$EC" EXIT INT TERM
+else
+  trap "EC=\$?; $kubectl delete pod --wait=false $pod >&2 || true; exit \$EC" EXIT INT TERM
+fi
 
-echo "spawning \"$pod\" on \"$node\"" >&2
-$kubectl run --image "$image" --restart=Never --overrides="$overrides" --labels="$labels" --pod-running-timeout="$pod_running_timeout" $([ "$tty" = true ] && echo -t) -i "$pod" $generator
+if [ "$silent" != true ]; then
+  echo "spawning \"$pod\" on \"$node\"" >&2
+fi
+$kubectl run --image "$image" --restart=Never --overrides="$overrides" --labels="$labels" --pod-running-timeout="$pod_running_timeout" $([ "$tty" = true ] && echo -t) $([ "$silent" = true ] && echo --quiet) -i "$pod" $generator
