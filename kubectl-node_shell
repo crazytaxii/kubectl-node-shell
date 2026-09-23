@@ -259,4 +259,24 @@ fi
 if [ "$silent" != true ]; then
   echo "spawning \"$pod\" on \"$node\"" >&2
 fi
-$kubectl run --image "$image" --restart=Never --overrides="$overrides" --labels="$labels" --pod-running-timeout="$pod_running_timeout" $([ "$tty" = true ] && echo -t) $([ "$silent" = true ] && echo --quiet) -i "$pod" $generator
+exit_code=0
+$kubectl run --image "$image" --restart=Never --overrides="$overrides" --labels="$labels" --pod-running-timeout="$pod_running_timeout" $([ "$tty" = true ] && echo -t) $([ "$silent" = true ] && echo --quiet) -i "$pod" $generator || exit_code=$?
+
+if [ "$exit_code" -ne 0 ]; then
+  i=0
+  while [ "$i" -lt 10 ]; do
+    terminated_exit_code="$($kubectl get pod "$pod" --output "jsonpath={.status.containerStatuses[?(@.name=='$name')].state.terminated.exitCode}" 2>/dev/null)" || break
+    if [ -n "$terminated_exit_code" ]; then
+      if [ "$silent" != true ]; then
+        echo "failed to attach, printing logs of \"$pod\" instead:" >&2
+      fi
+      $kubectl logs --container "$name" "$pod" || true
+      exit_code="$terminated_exit_code"
+      break
+    fi
+    i=$((i + 1))
+    sleep 1
+  done
+fi
+
+exit "$exit_code"
